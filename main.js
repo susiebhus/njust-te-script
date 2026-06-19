@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NJUST 教学评价一键填写
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  南理工教务系统教学评价快速填写
 // @match        *://bkjw.njust.edu.cn/*
 // @grant        none
@@ -203,38 +203,9 @@
         };
 
         if (options.showAlert !== false) {
-            alert(`已填写 ${result.groupCount} 组评价，其中第 ${fallbackGroupNumber || "?"} 组随机设为“较符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。请确认无误后再保存或提交。`);
+            alert(`已填写 ${result.groupCount} 组评价，其中第 ${fallbackGroupNumber || "?"} 组随机设为“较符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。请确认无误后手动保存或提交。`);
         }
 
-        return result;
-    }
-
-    function findButtonByText(textList) {
-        const candidates = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a"));
-
-        return candidates.find(el => {
-            if (!isVisible(el) || el.disabled) return false;
-
-            const text = (el.innerText || el.value || el.textContent || "").replace(/\s+/g, "");
-            return textList.some(target => text === target || text.includes(target));
-        });
-    }
-
-    function clickPageButton(textList, missingMessage) {
-        const btn = findButtonByText(textList);
-
-        if (!btn) {
-            alert(missingMessage);
-            return;
-        }
-
-        btn.click();
-    }
-
-    async function fillAndClick(textList, missingMessage) {
-        const result = await fillEvaluation({ showAlert: false });
-        await sleep(500);
-        clickPageButton(textList, missingMessage);
         return result;
     }
 
@@ -285,8 +256,6 @@
 
         panel.appendChild(title);
         panel.appendChild(makePanelButton("一键填写", fillEvaluation, true));
-        panel.appendChild(makePanelButton("一键填写保存", () => fillAndClick(["保存"], "没有找到页面上的“保存”按钮"), false));
-        panel.appendChild(makePanelButton("一键填写提交", () => fillAndClick(["提交"], "没有找到页面上的“提交”按钮"), false));
 
         document.body.appendChild(panel);
     }
