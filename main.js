@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NJUST 教学评价一键填写
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  南理工教务系统教学评价快速填写
 // @match        *://bkjw.njust.edu.cn/*
 // @grant        none
@@ -16,6 +16,7 @@
         fallbackOptionIndex: 1,
         commentText: "老师教学认真负责，课程内容清晰，讲解准确，课堂安排合理，对学习很有帮助。",
         panelId: "njust-auto-eval-panel",
+        toastId: "njust-auto-eval-toast",
     };
 
     function sleep(ms) {
@@ -24,6 +25,45 @@
 
     function trigger(el, type) {
         el.dispatchEvent(new Event(type, { bubbles: true }));
+    }
+
+    function showToast(message, type = "success") {
+        const oldToast = document.getElementById(CONFIG.toastId);
+        if (oldToast) oldToast.remove();
+
+        const toast = document.createElement("div");
+        toast.id = CONFIG.toastId;
+        toast.innerText = message;
+        toast.style.position = "fixed";
+        toast.style.right = "24px";
+        toast.style.bottom = "146px";
+        toast.style.zIndex = "1000000";
+        toast.style.maxWidth = "420px";
+        toast.style.padding = "12px 14px";
+        toast.style.background = type === "error" ? "rgba(190, 55, 55, 0.96)" : "rgba(42, 91, 165, 0.96)";
+        toast.style.color = "#fff";
+        toast.style.borderRadius = "8px";
+        toast.style.boxShadow = "0 8px 24px rgba(0,0,0,0.22)";
+        toast.style.fontSize = "14px";
+        toast.style.fontWeight = "700";
+        toast.style.lineHeight = "1.5";
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(8px)";
+        toast.style.transition = "opacity 180ms ease, transform 180ms ease";
+        toast.style.pointerEvents = "none";
+
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.style.opacity = "1";
+            toast.style.transform = "translateY(0)";
+        });
+
+        window.setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(8px)";
+            window.setTimeout(() => toast.remove(), 220);
+        }, 2600);
     }
 
     function isVisible(el) {
@@ -168,7 +208,7 @@
         const groups = collectRadioGroups();
 
         if (groups.length === 0) {
-            alert("没有找到评价选项，请确认当前页面是教学评价页面");
+            showToast("没有找到评价选项，请确认当前页面是教学评价页面", "error");
             return;
         }
 
@@ -202,8 +242,8 @@
             fallbackGroupNumber,
         };
 
-        if (options.showAlert !== false) {
-            alert(`已填写 ${result.groupCount} 组评价，其中第 ${fallbackGroupNumber || "?"} 组随机设为“较符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。请确认无误后手动保存或提交。`);
+        if (options.showToast !== false) {
+            showToast(`已填写 ${result.groupCount} 组评价，其中第 ${fallbackGroupNumber || "?"} 组随机设为“较符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。`);
         }
 
         return result;
