@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NJUST 教学评价一键填写
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  南理工教务系统教学评价快速填写
 // @match        *://bkjw.njust.edu.cn/*
 // @grant        none
@@ -13,6 +13,7 @@
     const CONFIG = {
         // 0 = 很符合，1 = 较符合，2 = 一般，3 = 不符合，4 = 极不符合
         defaultOptionIndex: 0,
+        fallbackOptionIndex: 1,
         commentText: "老师教学认真负责，课程内容清晰，讲解准确，课堂安排合理，对学习很有帮助。",
         panelId: "njust-auto-eval-panel",
     };
@@ -60,6 +61,16 @@
 
     function uniqueByNode(nodes) {
         return Array.from(new Set(nodes));
+    }
+
+    function randomIndex(length) {
+        if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+            const values = new Uint32Array(1);
+            window.crypto.getRandomValues(values);
+            return values[0] % length;
+        }
+
+        return Math.floor(Math.random() * length);
     }
 
     function collectRadioGroups() {
@@ -140,7 +151,18 @@
         return filled;
     }
 
-    async function fillEvaluation() {
+    function selectGroupOption(group, optionIndex) {
+        const target = group[Math.min(optionIndex, group.length - 1)];
+
+        if (!target.checked) {
+            setRadioChecked(target);
+            return true;
+        }
+
+        return false;
+    }
+
+    async function fillEvaluation(options = {}) {
         console.log("开始填写教学评价...");
 
         const groups = collectRadioGroups();
@@ -153,19 +175,38 @@
         let checkedCount = 0;
 
         groups.forEach(group => {
-            const optionIndex = Math.min(CONFIG.defaultOptionIndex, group.length - 1);
-            const target = group[optionIndex];
-
-            if (!target.checked) {
-                setRadioChecked(target);
+            if (selectGroupOption(group, CONFIG.defaultOptionIndex)) {
                 checkedCount += 1;
             }
         });
 
+        const fallbackGroups = groups.filter(group => group.length > CONFIG.fallbackOptionIndex);
+        let fallbackGroupNumber = 0;
+
+        if (fallbackGroups.length > 0) {
+            const fallbackGroup = fallbackGroups[randomIndex(fallbackGroups.length)];
+            fallbackGroupNumber = groups.indexOf(fallbackGroup) + 1;
+
+            if (selectGroupOption(fallbackGroup, CONFIG.fallbackOptionIndex)) {
+                checkedCount += 1;
+            }
+        }
+
         await sleep(300);
 
         const commentCount = fillComments();
-        alert(`已选择 ${checkedCount || groups.length} 组“很符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。请确认无误后再保存或提交。`);
+        const result = {
+            checkedCount: checkedCount || groups.length,
+            commentCount,
+            groupCount: groups.length,
+            fallbackGroupNumber,
+        };
+
+        if (options.showAlert !== false) {
+            alert(`已填写 ${result.groupCount} 组评价，其中第 ${fallbackGroupNumber || "?"} 组随机设为“较符合”${commentCount ? `，并填写 ${commentCount} 处文字意见` : ""}。请确认无误后再保存或提交。`);
+        }
+
+        return result;
     }
 
     function findButtonByText(textList) {
@@ -188,6 +229,13 @@
         }
 
         btn.click();
+    }
+
+    async function fillAndClick(textList, missingMessage) {
+        const result = await fillEvaluation({ showAlert: false });
+        await sleep(500);
+        clickPageButton(textList, missingMessage);
+        return result;
     }
 
     function makePanelButton(text, onClick, isPrimary) {
@@ -227,9 +275,18 @@
         panel.style.borderRadius = "8px";
         panel.style.boxShadow = "0 6px 18px rgba(0,0,0,0.18)";
 
-        panel.appendChild(makePanelButton("一键很符合", fillEvaluation, true));
-        panel.appendChild(makePanelButton("保存", () => clickPageButton(["保存"], "没有找到页面上的“保存”按钮"), false));
-        panel.appendChild(makePanelButton("提交", () => clickPageButton(["提交"], "没有找到页面上的“提交”按钮"), false));
+        const title = document.createElement("span");
+        title.innerText = "脚本控制";
+        title.style.fontSize = "13px";
+        title.style.fontWeight = "700";
+        title.style.color = "#345";
+        title.style.padding = "0 2px";
+        title.style.whiteSpace = "nowrap";
+
+        panel.appendChild(title);
+        panel.appendChild(makePanelButton("一键填写", fillEvaluation, true));
+        panel.appendChild(makePanelButton("一键填写保存", () => fillAndClick(["保存"], "没有找到页面上的“保存”按钮"), false));
+        panel.appendChild(makePanelButton("一键填写提交", () => fillAndClick(["提交"], "没有找到页面上的“提交”按钮"), false));
 
         document.body.appendChild(panel);
     }
