@@ -56,10 +56,6 @@
         target.click();
 
         ["mousedown", "mouseup", "click", "input", "change"].forEach(type => trigger(radio, type));
-
-        if (typeof radio.onclick === "function") {
-            radio.onclick();
-        }
     }
 
     function uniqueByNode(nodes) {
@@ -245,7 +241,11 @@
         observer.observe(document.documentElement, { childList: true, subtree: true });
     }
 
-    window.addEventListener("load", () => {
+    if (document.readyState === "loading") {
+        window.addEventListener("load", () => {
+            setTimeout(init, 1000);
+        });
+    } else {
         setTimeout(init, 1000);
-    });
+    }
 })();
